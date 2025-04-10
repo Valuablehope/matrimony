@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ali & Yara – Matrimony Memories Upload</title>
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -43,7 +44,7 @@
       margin-bottom: 30px;
       font-style: italic;
     }
-    input[type="text"], textarea {
+    input, textarea, input[type="file"] {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -52,7 +53,7 @@
       font-size: 16px;
       display: block;
     }
-    .upload-btn {
+    button.upload-btn {
       display: block;
       width: 100%;
       padding: 12px 24px;
@@ -62,10 +63,9 @@
       border-radius: 8px;
       font-size: 16px;
       cursor: pointer;
-      text-decoration: none;
       margin-top: 10px;
     }
-    .upload-btn:hover {
+    button.upload-btn:hover {
       background-color: #3c275c;
     }
     footer {
@@ -74,7 +74,6 @@
       color: white;
       text-align: center;
     }
-
     @media (max-width: 480px) {
       .container {
         padding: 20px;
@@ -82,7 +81,7 @@
       h1 {
         font-size: 24px;
       }
-      .upload-btn {
+      button.upload-btn {
         font-size: 18px;
       }
     }
@@ -92,14 +91,58 @@
   <div class="container">
     <h1>Ali & Yara</h1>
     <p class="subtitle">Matrimony Memories Upload</p>
-    <form>
-      <input type="text" placeholder="Your Name (optional)" /><br />
-      <textarea rows="3" placeholder="A message for Ali & Yara (optional)"></textarea><br />
-      <a href="https://www.dropbox.com/request/VDnIgnJGTEdHrnmJlQe4" target="_blank" class="upload-btn">Upload Your Photos</a>
+    <form id="upload-form">
+      <input type="text" id="name" placeholder="Your Name (optional)" />
+      <textarea id="message" rows="3" placeholder="A message for Ali & Yara (optional)"></textarea>
+      <input type="file" id="photos" accept="image/*" multiple required />
+      <button type="submit" class="upload-btn">Upload Your Photos</button>
     </form>
+    <p id="status" style="margin-top:10px; font-size:14px;"></p>
   </div>
   <footer>
     Thank you for being a part of our celebration 💜
   </footer>
+
+  <script>
+    const SUPABASE_URL = 'https://jvioyunubthpuunizbof.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2aW95dW51YnRocHV1bml6Ym9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNDE4ODIsImV4cCI6MjA1OTgxNzg4Mn0.JJ7jOh211LnLoJh2BFiullhh4SMoGcodohSPeHMAcVE';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const form = document.getElementById('upload-form');
+    const statusText = document.getElementById('status');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const files = document.getElementById('photos').files;
+      const name = document.getElementById('name').value.trim();
+      const message = document.getElementById('message').value.trim();
+
+      if (!files.length) {
+        statusText.textContent = 'Please select at least one photo.';
+        return;
+      }
+
+      for (const file of files) {
+        const timestamp = Date.now();
+        const filename = `${timestamp}-${file.name}`;
+        const metadataFilename = `${timestamp}-${file.name}.txt`;
+
+        const { error: uploadError } = await supabaseClient.storage.from('uploads').upload(filename, file);
+        if (uploadError) {
+          statusText.textContent = `Upload failed: ${uploadError.message}`;
+          return;
+        }
+
+        if (name || message) {
+          const metaText = `Name: ${name || 'Anonymous'}\nMessage: ${message || 'No message.'}`;
+          const blob = new Blob([metaText], { type: 'text/plain' });
+          await supabaseClient.storage.from('uploads').upload(metadataFilename, blob);
+        }
+      }
+
+      statusText.textContent = 'Upload successful. Thank you!';
+      form.reset();
+    });
+  </script>
 </body>
 </html>
