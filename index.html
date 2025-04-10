@@ -53,6 +53,20 @@
       font-size: 16px;
       display: block;
     }
+    .progress-container {
+      width: 100%;
+      background: #e0d1f0;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+    }
+    .progress-bar {
+      height: 14px;
+      width: 0;
+      background-color: #4e3474;
+      border-radius: 8px;
+      transition: width 0.3s;
+    }
     button.upload-btn {
       display: block;
       width: 100%;
@@ -65,7 +79,11 @@
       cursor: pointer;
       margin-top: 10px;
     }
-    button.upload-btn:hover {
+    button.upload-btn:disabled {
+      background-color: #b9a9d1;
+      cursor: not-allowed;
+    }
+    button.upload-btn:hover:enabled {
       background-color: #3c275c;
     }
     footer {
@@ -95,7 +113,10 @@
       <input type="text" id="name" placeholder="Your Name (optional)" />
       <textarea id="message" rows="3" placeholder="A message for Ali & Yara (optional)"></textarea>
       <input type="file" id="photos" accept="image/*" multiple required />
-      <button type="submit" class="upload-btn">Upload Your Photos</button>
+      <div class="progress-container" id="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <button type="submit" class="upload-btn" id="upload-btn" disabled>Upload Your Photos</button>
     </form>
     <p id="status" style="margin-top:10px; font-size:14px;"></p>
   </div>
@@ -110,10 +131,18 @@
 
     const form = document.getElementById('upload-form');
     const statusText = document.getElementById('status');
+    const progressBar = document.getElementById('progress-bar');
+    const progressContainer = document.getElementById('progress-container');
+    const uploadBtn = document.getElementById('upload-btn');
+    const photosInput = document.getElementById('photos');
+
+    photosInput.addEventListener('change', () => {
+      uploadBtn.disabled = !photosInput.files.length;
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const files = document.getElementById('photos').files;
+      const files = photosInput.files;
       const name = document.getElementById('name').value.trim();
       const message = document.getElementById('message').value.trim();
 
@@ -122,26 +151,41 @@
         return;
       }
 
-      for (const file of files) {
-        const timestamp = Date.now();
-        const filename = `${timestamp}-${file.name}`;
-        const metadataFilename = `${timestamp}-${file.name}.txt`;
+      uploadBtn.disabled = true;
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
 
+      const totalSteps = files.length + (name || message ? 1 : 0);
+      let uploaded = 0;
+
+      const timestamp = Date.now();
+      const metaText = `Name: ${name || 'Anonymous'}\nMessage: ${message || 'No message.'}`;
+      const metaBlob = new Blob([metaText], { type: 'text/plain' });
+
+      for (const file of files) {
+        const filename = `${timestamp}-${file.name}`;
         const { error: uploadError } = await supabaseClient.storage.from('uploads').upload(filename, file);
+        uploaded++;
+        progressBar.style.width = `${(uploaded / totalSteps) * 100}%`;
+
         if (uploadError) {
           statusText.textContent = `Upload failed: ${uploadError.message}`;
+          uploadBtn.disabled = false;
           return;
-        }
-
-        if (name || message) {
-          const metaText = `Name: ${name || 'Anonymous'}\nMessage: ${message || 'No message.'}`;
-          const blob = new Blob([metaText], { type: 'text/plain' });
-          await supabaseClient.storage.from('uploads').upload(metadataFilename, blob);
         }
       }
 
+      if (name || message) {
+        const metadataFilename = `${timestamp}-meta.txt`;
+        await supabaseClient.storage.from('uploads').upload(metadataFilename, metaBlob);
+        uploaded++;
+        progressBar.style.width = `${(uploaded / totalSteps) * 100}%`;
+      }
+
+      progressBar.style.width = '100%';
       statusText.textContent = 'Upload successful. Thank you!';
       form.reset();
+      uploadBtn.disabled = true;
     });
   </script>
 </body>
